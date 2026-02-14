@@ -59,7 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showReportDetailPopup(BuildContext context, Report report) {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
+      builder: (dialogContext) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: SingleChildScrollView(
           child: Padding(
@@ -88,11 +88,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                             color: Colors.redAccent,
                           ),
                           onPressed: () =>
-                              _showDeleteConfirmation(context, report.id),
+                              _showDeleteConfirmation(dialogContext, report.id),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.pop(dialogContext),
                         ),
                       ],
                     ),
@@ -139,7 +139,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(dialogContext),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1E3A8A),
                       foregroundColor: Colors.white,
@@ -210,6 +210,82 @@ class _ProfileScreenState extends State<ProfileScreen>
               style: GoogleFonts.inter(
                 color: Colors.redAccent,
                 fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditNameDialog(String currentName) {
+    final TextEditingController nameController = TextEditingController(
+      text: currentName,
+    );
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Edit Name',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
+        content: TextField(
+          controller: nameController,
+          decoration:
+              const InputDecoration(
+                hintText: 'Enter your name',
+                border: OutlineInputBorder(),
+              ).copyWith(
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFF1E3A8A)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newName = nameController.text.trim();
+              if (newName.isNotEmpty) {
+                Navigator.pop(dialogContext);
+                try {
+                  await _apiService.updateProfileName(newName);
+                  if (mounted) {
+                    setState(() {
+                      _userFuture = _apiService.fetchUserProfile();
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Name updated successfully'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            child: Text(
+              'Save',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF1E3A8A),
               ),
             ),
           ),
@@ -339,13 +415,28 @@ class _ProfileScreenState extends State<ProfileScreen>
                   opacity: _fadeAnimation,
                   child: Column(
                     children: [
-                      Text(
-                        user.name,
-                        style: GoogleFonts.outfit(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: darkColor,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            user.name,
+                            style: GoogleFonts.outfit(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: darkColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: () => _showEditNameDialog(user.name),
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Container(
@@ -731,7 +822,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showLogoutDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Logout',
@@ -743,14 +834,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('Cancel', style: GoogleFonts.inter(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               await AuthService().logout();
-              if (context.mounted) {
+              if (mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => const AuthScreen()),

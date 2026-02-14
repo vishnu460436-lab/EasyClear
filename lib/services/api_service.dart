@@ -150,6 +150,20 @@ class ApiService {
     }
   }
 
+  Future<void> updateProfileName(String newName) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('No user logged in');
+
+    try {
+      await supabase
+          .from('profiles')
+          .update({'username': newName})
+          .eq('id', user.id);
+    } catch (e) {
+      throw Exception('Failed to update profile name: $e');
+    }
+  }
+
   Future<void> deleteReport(String reportId) async {
     final user = supabase.auth.currentUser;
     if (user == null) throw Exception('No user logged in');
