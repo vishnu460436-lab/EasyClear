@@ -4,6 +4,7 @@ import 'auth_screen.dart';
 import '../services/api_service.dart';
 import '../models/report_model.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final String department;
@@ -469,6 +470,34 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
+  Future<void> _openMap(double latitude, double longitude) async {
+    final Uri googleMapsUrl = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+    );
+
+    try {
+      // Try launching with external application mode first
+      final launched = await launchUrl(
+        googleMapsUrl,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        throw 'Launch failed';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not open Google Maps. Please ensure the app is installed.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _markAsFixed(String reportId) async {
     try {
       await _apiService.updateReportStatus(reportId, 'fixed');
@@ -553,6 +582,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
+                if (report.latitude != null && report.longitude != null) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _openMap(report.latitude!, report.longitude!),
+                      icon: const Icon(Icons.map_outlined),
+                      label: const Text('View on Google Maps'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Color(0xFF1E3A8A)),
+                        foregroundColor: const Color(0xFF1E3A8A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 if (report.status != 'fixed')
                   SizedBox(
                     width: double.infinity,

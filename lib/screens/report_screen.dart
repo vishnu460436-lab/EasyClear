@@ -2,7 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'success_screen.dart';
+import 'map_picker_screen.dart';
+import 'package:latlong2/latlong.dart' as ll;
 import '../services/api_service.dart';
 
 class ReportScreen extends StatefulWidget {
@@ -33,6 +37,9 @@ class _ReportScreenState extends State<ReportScreen> {
   File? _image;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
+  double? _latitude;
+  double? _longitude;
+  bool _isGettingLocation = false;
 
   @override
   void dispose() {
@@ -82,6 +89,83 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
+  Future<void> _getCurrentLocation() async {
+    setState(() => _isGettingLocation = true);
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw 'Location services are disabled.';
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw 'Location permissions are denied';
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw 'Location permissions are permanently denied';
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
+
+      // Reverse geocoding to get address
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        String address = [
+          place.name,
+          place.street,
+          place.locality,
+          place.administrativeArea,
+        ].where((e) => e != null && e.isNotEmpty).join(", ");
+
+        setState(() {
+          _locationController.text = address;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isGettingLocation = false);
+    }
+  }
+
+  Future<void> _pickOnMap() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapPickerScreen(
+          initialLocation: _latitude != null && _longitude != null
+              ? ll.LatLng(_latitude!, _longitude!)
+              : null,
+        ),
+      ),
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        _latitude = (result['location'] as ll.LatLng).latitude;
+        _longitude = (result['location'] as ll.LatLng).longitude;
+        _locationController.text = result['address'];
+      });
+    }
+  }
+
   Future<void> _submitReport() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -116,6 +200,8 @@ class _ReportScreenState extends State<ReportScreen> {
         address: _locationController.text.trim().isEmpty
             ? null
             : _locationController.text.trim(),
+        latitude: _latitude,
+        longitude: _longitude,
         imageFile: _image!,
       );
 
@@ -268,15 +354,75 @@ class _ReportScreenState extends State<ReportScreen> {
                               // Location
                               _buildLabel('Location Address:'),
                               const SizedBox(height: 8),
-                              _buildTextField(
-                                controller: _locationController,
-                                hintText: 'Enter address',
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter an address';
-                                  }
-                                  return null;
-                                },
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildTextField(
+                                      controller: _locationController,
+                                      hintText: 'Enter address',
+                                      validator: (value) {
+                                        if (value == null || value.isEmpty) {
+                                          return 'Please enter an address';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: _isGettingLocation
+                                        ? null
+                                        : _getCurrentLocation,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF1E3A8A,
+                                        ).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(
+                                            0xFF1E3A8A,
+                                          ).withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      child: _isGettingLocation
+                                          ? const SizedBox(
+                                              width: 24,
+                                              height: 24,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.my_location,
+                                              color: Color(0xFF1E3A8A),
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: _pickOnMap,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(
+                                          0xFF1E3A8A,
+                                        ).withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(
+                                            0xFF1E3A8A,
+                                          ).withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.map,
+                                        color: Color(0xFF1E3A8A),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 20),
 
