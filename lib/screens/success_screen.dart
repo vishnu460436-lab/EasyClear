@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'home_screen.dart';
+import 'profile_screen.dart';
 
 class SuccessScreen extends StatefulWidget {
   const SuccessScreen({super.key});
@@ -106,13 +107,12 @@ class _SuccessScreenState extends State<SuccessScreen>
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Navigate only to Home, removing all previous routes
-                    Navigator.pushAndRemoveUntil(
+                    // Navigate to Profile Screen
+                    Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const HomeScreen(),
+                        builder: (context) => const ProfileScreen(),
                       ),
-                      (route) => false,
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -124,22 +124,24 @@ class _SuccessScreenState extends State<SuccessScreen>
                       borderRadius: BorderRadius.circular(28),
                     ),
                   ),
-                  child: Text(
-                    'Back to Home',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Text(
+                    'View My Submissions',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
-                  // Todo: Navigate to Submissions list
+                  // Back to Home
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomeScreen()),
+                    (route) => false,
+                  );
                 },
                 child: Text(
-                  'View My Submissions',
+                  'Back to Home',
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

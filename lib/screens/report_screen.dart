@@ -113,7 +113,9 @@ class _ReportScreenState extends State<ReportScreen> {
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         category: _selectedCategory!,
-        address: _locationController.text.trim(),
+        address: _locationController.text.trim().isEmpty
+            ? null
+            : _locationController.text.trim(),
         imageFile: _image!,
       );
 
@@ -266,46 +268,12 @@ class _ReportScreenState extends State<ReportScreen> {
                               // Location
                               _buildLabel('Location Address:'),
                               const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildTextField(
-                                      controller: _locationController,
-                                      hintText: 'Enter address...',
-                                      validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'Please enter an address';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      // TODO: Add map picker
-                                    },
-                                    icon: const Icon(
-                                      Icons.location_on,
-                                      size: 18,
-                                    ),
-                                    label: const Text('Pick'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFF1F5F9),
-                                      foregroundColor: const Color(0xFF334155),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 20,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        side: const BorderSide(
-                                          color: Color(0xFFE2E8F0),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              _buildTextField(
+                                controller: _locationController,
+                                hintText: 'Enter address (optional)',
+                                validator: (value) {
+                                  return null; // Optional field
+                                },
                               ),
                               const SizedBox(height: 20),
 

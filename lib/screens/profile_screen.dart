@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/user_model.dart';
+import '../models/report_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import 'all_submissions_screen.dart';
 import 'auth_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'about_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -52,6 +56,196 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
+  void _showReportDetailPopup(BuildContext context, Report report) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        report.title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.redAccent,
+                          ),
+                          onPressed: () =>
+                              _showDeleteConfirmation(context, report.id),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (report.imageUrl != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      report.imageUrl!,
+                      width: double.infinity,
+                      height: 200,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                _buildDetailRow('Category', report.category),
+                _buildDetailRow(
+                  'Status',
+                  report.status,
+                  valueColor: _getStatusColor(report.status),
+                ),
+                _buildDetailRow(
+                  'Date',
+                  "${report.createdAt.day}/${report.createdAt.month}/${report.createdAt.year}",
+                ),
+                if (report.locationAddress != null)
+                  _buildDetailRow('Location', report.locationAddress!),
+                const SizedBox(height: 16),
+                Text(
+                  'Description',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  report.description,
+                  style: GoogleFonts.inter(color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E3A8A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, String reportId) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Delete Report',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to delete this report? This action cannot be undone.',
+          style: GoogleFonts.inter(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext); // Close confirmation
+              Navigator.pop(context); // Close detail popup
+
+              try {
+                await _apiService.deleteReport(reportId);
+                if (mounted) {
+                  setState(() {
+                    _userFuture = _apiService.fetchUserProfile();
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Report deleted successfully'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text(
+              'Delete',
+              style: GoogleFonts.inter(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF1E3A8A);
@@ -79,42 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      color: Colors.red,
-                      size: 60,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Failed to load profile',
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      snapshot.error.toString(),
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => setState(() {
-                        _userFuture = _apiService.fetchUserProfile();
-                      }),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            );
+            return _buildErrorState(snapshot.error.toString());
           } else if (!snapshot.hasData) {
             return const Center(child: Text('No data found'));
           }
@@ -129,7 +288,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    // Gradient Background
                     Container(
                       height: 280,
                       decoration: const BoxDecoration(
@@ -144,15 +302,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ),
                     ),
-
-                    // User Details overlapping the bottom
                     Positioned(
                       bottom: -60,
                       child: FadeTransition(
                         opacity: _fadeAnimation,
                         child: Column(
                           children: [
-                            // Avatar Ring
                             Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
@@ -178,10 +333,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ],
                 ),
 
-                const SizedBox(
-                  height: 70,
-                ), // Spacing for the overlapping avatar
-                // Name & ID
+                const SizedBox(height: 70),
+
                 FadeTransition(
                   opacity: _fadeAnimation,
                   child: Column(
@@ -195,36 +348,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: primaryColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'ID: #${user.id}',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: primaryColor,
-                              ),
-                            ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'ID: #${user.id}',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: primaryColor,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '•  ${user.location}',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -257,6 +397,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             'Reports',
                             user.totalReports.toString(),
                             primaryColor,
+                            subtitle: 'Submissions',
                           ),
                           _buildDivider(),
                           _buildStatItem(
@@ -287,7 +428,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AllSubmissionsScreen(
+                                reports: user.recentSubmissions,
+                              ),
+                            ),
+                          );
+                        },
                         child: Text(
                           'View All',
                           style: GoogleFonts.inter(
@@ -308,15 +458,20 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: SlideTransition(
                     position: _slideAnimation,
                     child: Column(
-                      children: user.recentSubmissions.map((report) {
+                      children: user.recentSubmissions.take(2).map((report) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildSubmissionCard(
-                            title: report.title,
-                            date:
-                                "${report.createdAt.day}/${report.createdAt.month}/${report.createdAt.year}",
-                            status: report.status,
-                            statusColor: _getStatusColor(report.status),
+                          child: InkWell(
+                            onTap: () =>
+                                _showReportDetailPopup(context, report),
+                            borderRadius: BorderRadius.circular(16),
+                            child: _buildSubmissionCard(
+                              title: report.title,
+                              date:
+                                  "${report.createdAt.day}/${report.createdAt.month}/${report.createdAt.year}",
+                              status: report.status,
+                              statusColor: _getStatusColor(report.status),
+                            ),
                           ),
                         );
                       }).toList(),
@@ -333,6 +488,41 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 60),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load profile',
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => setState(() {
+                _userFuture = _apiService.fetchUserProfile();
+              }),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'resolved':
@@ -345,7 +535,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  Widget _buildStatItem(String label, String value, Color color) {
+  Widget _buildStatItem(
+    String label,
+    String value,
+    Color color, {
+    String? subtitle,
+  }) {
     return Column(
       children: [
         Text(
@@ -365,6 +560,16 @@ class _ProfileScreenState extends State<ProfileScreen>
             fontWeight: FontWeight.w500,
           ),
         ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -483,24 +688,28 @@ class _ProfileScreenState extends State<ProfileScreen>
               onTap: () => Navigator.pop(context),
             ),
             _buildSettingsItem(
-              icon: Icons.notifications_none_outlined,
-              title: 'Notifications',
-              onTap: () => Navigator.pop(context),
-            ),
-            _buildSettingsItem(
               icon: Icons.lock_outline,
               title: 'Privacy',
-              onTap: () => Navigator.pop(context),
-            ),
-            _buildSettingsItem(
-              icon: Icons.help_outline,
-              title: 'Help',
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PrivacyPolicyScreen(),
+                  ),
+                );
+              },
             ),
             _buildSettingsItem(
               icon: Icons.info_outline,
               title: 'About',
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AboutScreen()),
+                );
+              },
             ),
             const Divider(height: 32),
             _buildSettingsItem(
@@ -508,7 +717,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               title: 'Logout',
               color: Colors.redAccent,
               onTap: () {
-                Navigator.pop(context); // Close bottom sheet
+                Navigator.pop(context);
                 _showLogoutDialog();
               },
             ),
@@ -539,7 +748,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context);
               await AuthService().logout();
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(

@@ -228,21 +228,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                               isPassword: true,
                             ),
 
-                            if (_isLogin)
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () {},
-                                  child: Text(
-                                    'Forgot Password?',
-                                    style: GoogleFonts.inter(
-                                      color: secondaryColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-
                             const SizedBox(height: 32),
 
                             _buildActionButton(

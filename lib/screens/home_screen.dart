@@ -246,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 )
               else
                 IconButton(
-                  icon: Icon(Icons.person_outline, color: primaryColor),
+                  icon: const Icon(Icons.person_outline, color: Colors.black),
                   onPressed: () {
                     Navigator.push(
                       context,
