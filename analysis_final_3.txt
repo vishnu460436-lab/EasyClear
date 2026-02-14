@@ -1,0 +1,8 @@
+﻿Analyzing easyclear...                                          
+
+   info - Use 'const' with the constructor to improve performance - lib\screens\auth_screen.dart:418:31 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\auth_screen.dart:448:31 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\home_screen.dart:84:33 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\home_screen.dart:116:33 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\screens\report_screen.dart:114:29 - prefer_const_constructors
+

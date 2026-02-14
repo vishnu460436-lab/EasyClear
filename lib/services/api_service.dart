@@ -1,0 +1,97 @@
+import 'dart:io';
+import 'package:easyclear/main.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/user_model.dart';
+import '../models/report_model.dart';
+
+class ApiService {
+  Future<UserModel> fetchUserProfile() async {
+    try {
+      final user = supabase.auth.currentUser;
+
+      if (user == null) {
+        throw Exception('No user logged in');
+      }
+
+      // Fetch profile data from Supabase
+      final profileResponse = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .single();
+
+      // Fetch recent reports from Supabase
+      final reportsResponse = await supabase
+          .from('reports')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false)
+          .limit(10);
+
+      // Convert reports JSON to Report objects
+      final List<Report> recentReports = (reportsResponse as List)
+          .map((data) => Report.fromJson(data))
+          .toList();
+
+      // Construct UserModel
+      return UserModel(
+        id: user.id.substring(0, 8).toUpperCase(),
+        name: profileResponse['username'] ?? 'Community Member',
+        location: profileResponse['location'] ?? 'Kochi, Kerala',
+        avatarUrl:
+            profileResponse['avatar_url'] ??
+            'https://ui-avatars.com/api/?name=${profileResponse['username'] ?? 'User'}&background=random',
+        totalReports: profileResponse['total_reports'] ?? 0,
+        resolvedReports: profileResponse['resolved_reports'] ?? 0,
+        impactPoints: profileResponse['impact_points'] ?? 0,
+        recentSubmissions: recentReports,
+      );
+    } catch (e) {
+      throw Exception('Failed to load profile: $e');
+    }
+  }
+
+  Future<void> submitReport({
+    required String title,
+    required String description,
+    required String category,
+    required String address,
+    required File imageFile,
+  }) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('No user logged in');
+
+    try {
+      // 1. Upload Image
+      // Sanitize filename
+      final fileExt = imageFile.path.split('.').last;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filePath = '${user.id}/$timestamp.$fileExt';
+
+      await supabase.storage
+          .from('report-images')
+          .upload(
+            filePath,
+            imageFile,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+          );
+
+      final imageUrl = supabase.storage
+          .from('report-images')
+          .getPublicUrl(filePath);
+
+      // 2. Insert Report
+      await supabase.from('reports').insert({
+        'user_id': user.id,
+        'title': title,
+        'description': description,
+        'category': category,
+        'location_address': address,
+        'image_url': imageUrl,
+        'status': 'pending',
+      });
+    } catch (e) {
+      throw Exception('Failed to submit report: $e');
+    }
+  }
+}
