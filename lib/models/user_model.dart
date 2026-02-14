@@ -6,7 +6,7 @@ class UserModel {
   final String location;
   final String avatarUrl;
   final int totalReports;
-  final int resolvedReports;
+  final int fixedReports;
   final int impactPoints;
   final List<Report> recentSubmissions;
 
@@ -16,7 +16,7 @@ class UserModel {
     required this.location,
     required this.avatarUrl,
     required this.totalReports,
-    required this.resolvedReports,
+    required this.fixedReports,
     required this.impactPoints,
     required this.recentSubmissions,
   });
@@ -31,7 +31,7 @@ class UserModel {
       location: json['location'] ?? '',
       avatarUrl: json['avatarUrl'] ?? '',
       totalReports: json['totalReports'] ?? 0,
-      resolvedReports: json['resolvedReports'] ?? 0,
+      fixedReports: json['fixedReports'] ?? 0,
       impactPoints: json['impactPoints'] ?? 0,
       recentSubmissions: recentSubmissions ?? [],
     );

@@ -88,7 +88,7 @@ class _AllSubmissionsScreenState extends State<AllSubmissionsScreen> {
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'resolved':
+      case 'fixed':
         return Colors.green;
       case 'in progress':
         return const Color(0xFF3B82F6);

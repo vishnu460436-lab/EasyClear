@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'auth_screen.dart';
+import '../services/api_service.dart';
+import '../models/report_model.dart';
+import 'package:intl/intl.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final String department;
@@ -11,16 +14,73 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
+  final ApiService _apiService = ApiService();
+  List<Report> _allReports = [];
+  List<Report> _filteredReports = [];
+  String _selectedCategory = 'All';
+  String _selectedStatus = 'all';
+  bool _isLoading = true;
+
+  final List<String> _categories = [
+    'All',
+    'kseb',
+    'water',
+    'pwd',
+    'police',
+    'other',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final reports = await _apiService.fetchAllReports();
+      setState(() {
+        _allReports = reports;
+        _filterReports();
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
+      }
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _filterReports() {
+    setState(() {
+      _filteredReports = _allReports.where((report) {
+        final matchesCategory =
+            _selectedCategory == 'All' ||
+            report.category.toLowerCase() == _selectedCategory.toLowerCase();
+
+        final String statusKey = report.status.toLowerCase();
+        final matchesStatus =
+            _selectedStatus == 'all' || statusKey == _selectedStatus;
+
+        return matchesCategory && matchesStatus;
+      }).toList();
+    });
+  }
+
   Color get _deptColor {
     switch (widget.department.toUpperCase()) {
       case 'KSEB':
-        return const Color(0xFFF59E0B); // Amber
+        return const Color(0xFFF59E0B);
       case 'WATER':
-        return const Color(0xFF3B82F6); // Blue
+        return const Color(0xFF3B82F6);
       case 'ROADS':
-        return const Color(0xFF64748B); // Slate
+        return const Color(0xFF64748B);
       default:
-        return const Color(0xFF1E3A8A); // Navy
+        return const Color(0xFF1E3A8A);
     }
   }
 
@@ -29,114 +89,181 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     const darkColor = Color(0xFF0F172A);
     const bgColor = Color(0xFFF8FAFC);
 
+    final pendingCount = _allReports.where((r) => r.status == 'pending').length;
+    final fixedCount = _allReports.where((r) => r.status == 'fixed').length;
+
     return Scaffold(
       backgroundColor: bgColor,
-      body: CustomScrollView(
-        slivers: [
-          // Dynamic AppBar
-          SliverAppBar(
-            expandedHeight: 200.0,
-            floating: false,
-            pinned: true,
-            backgroundColor: _deptColor,
-            elevation: 0,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                '${widget.department} Admin Portal',
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.white,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [_deptColor, _deptColor.withValues(alpha: 0.8)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 180.0,
+              floating: false,
+              pinned: true,
+              backgroundColor: _deptColor,
+              elevation: 0,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Text(
+                  'Admin Portal',
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: Colors.white,
                   ),
                 ),
-                child: Center(
-                  child: Icon(
-                    _getDeptIcon(),
-                    size: 80,
-                    color: Colors.white.withValues(alpha: 0.2),
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white),
-                onPressed: () => _showLogoutDialog(context),
-              ),
-            ],
-          ),
-
-          // Stats Overview
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dashboard Overview',
-                    style: GoogleFonts.outfit(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: darkColor,
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [_deptColor, _deptColor.withValues(alpha: 0.8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      _buildStatCard('Pending', '12', Colors.redAccent),
-                      const SizedBox(width: 16),
-                      _buildStatCard('Active', '5', Colors.blue),
-                      const SizedBox(width: 16),
-                      _buildStatCard('Fixed', '48', Colors.green),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Submissions List Header
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Recent Submissions',
-                    style: GoogleFonts.outfit(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: darkColor,
+                  child: Center(
+                    child: Icon(
+                      _getDeptIcon(),
+                      size: 80,
+                      color: Colors.white.withValues(alpha: 0.2),
                     ),
                   ),
-                  TextButton(onPressed: () {}, child: const Text('Filter')),
-                ],
+                ),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.logout, color: Colors.white),
+                  onPressed: () => _showLogoutDialog(context),
+                ),
+              ],
+            ),
+
+            // Stats Overview
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _buildStatCard(
+                          'Pending',
+                          pendingCount.toString(),
+                          Colors.orange,
+                          isSelected: _selectedStatus == 'pending',
+                          onTap: () {
+                            setState(() {
+                              _selectedStatus = _selectedStatus == 'pending'
+                                  ? 'all'
+                                  : 'pending';
+                              _filterReports();
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 16),
+                        _buildStatCard(
+                          'Fixed',
+                          fixedCount.toString(),
+                          Colors.green,
+                          isSelected: _selectedStatus == 'fixed',
+                          onTap: () {
+                            setState(() {
+                              _selectedStatus = _selectedStatus == 'fixed'
+                                  ? 'all'
+                                  : 'fixed';
+                              _filterReports();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // Submissions List
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                return _buildAdminTaskCard(index);
-              }, childCount: 5),
+            // Filter Section
+            SliverToBoxAdapter(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: _categories.map((cat) {
+                    final isSelected = _selectedCategory == cat;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(cat.toUpperCase()),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedCategory = cat;
+                            _filterReports();
+                          });
+                        },
+                        selectedColor: _deptColor.withValues(alpha: 0.2),
+                        checkmarkColor: _deptColor,
+                        labelStyle: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: isSelected ? _deptColor : Colors.grey[600],
+                        ),
+                        backgroundColor: Colors.white,
+                        side: BorderSide(
+                          color: isSelected ? _deptColor : Colors.grey[200]!,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 40)),
-        ],
+            // Submissions List Header
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: Text(
+                  'Recent Submissions',
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: darkColor,
+                  ),
+                ),
+              ),
+            ),
+
+            // Submissions List
+            if (_isLoading)
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_filteredReports.isEmpty)
+              const SliverFillRemaining(
+                child: Center(child: Text('No submissions found')),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) =>
+                        _buildAdminTaskCard(_filteredReports[index]),
+                    childCount: _filteredReports.length,
+                  ),
+                ),
+              ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 40)),
+          ],
+        ),
       ),
     );
   }
@@ -154,55 +281,64 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    Color color, {
+    bool isSelected = false,
+    VoidCallback? onTap,
+  }) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-          border: Border.all(color: color.withValues(alpha: 0.1)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: GoogleFonts.outfit(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.05) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? color.withValues(alpha: 0.15)
+                    : color.withValues(alpha: 0.08),
+                blurRadius: isSelected ? 25 : 20,
+                offset: const Offset(0, 10),
               ),
+            ],
+            border: Border.all(
+              color: isSelected ? color : color.withValues(alpha: 0.1),
+              width: isSelected ? 2 : 1,
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
+          ),
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: isSelected ? color : const Color(0xFF64748B),
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildAdminTaskCard(int index) {
-    final titles = [
-      'Line Break in Sector 4',
-      'Transformer Sparking',
-      'Underground Cable Fault',
-      'Street Light Not Working',
-      'High Voltage Alert',
-    ];
+  Widget _buildAdminTaskCard(Report report) {
+    final dateStr = DateFormat('dd MMM, hh:mm a').format(report.createdAt);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -226,24 +362,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+                  horizontal: 10,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  color: _getStatusColor(report.status).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'PRIORITY',
+                  report.status.toUpperCase(),
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: Colors.redAccent,
+                    color: _getStatusColor(report.status),
                   ),
                 ),
               ),
               Text(
-                '2 hrs ago',
+                dateStr,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: const Color(0xFF94A3B8),
@@ -251,11 +387,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
-            widget.department == 'KSEB'
-                ? titles[index]
-                : 'New Issue #${1024 + index}',
+            report.title,
             style: GoogleFonts.outfit(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -271,11 +405,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 color: Color(0xFF64748B),
               ),
               const SizedBox(width: 4),
-              Text(
-                'Near Metro Station, Kochi',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: const Color(0xFF64748B),
+              Expanded(
+                child: Text(
+                  report.locationAddress ?? 'No address provided',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: const Color(0xFF64748B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -284,12 +422,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _deptColor.withValues(alpha: 0.1),
-                    foregroundColor: _deptColor,
-                    elevation: 0,
+                child: OutlinedButton(
+                  onPressed: () => _showReportDetailPopup(report),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: BorderSide(color: Colors.grey[200]!),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -298,21 +435,173 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _deptColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              if (report.status != 'fixed')
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _markAsFixed(report.id),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Fixed'),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'fixed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  Future<void> _markAsFixed(String reportId) async {
+    try {
+      await _apiService.updateReportStatus(reportId, 'fixed');
+      _loadData(); // Refresh list
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report marked as fixed!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showReportDetailPopup(Report report) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        report.title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (report.imageUrl != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      report.imageUrl!,
+                      width: double.infinity,
+                      height: 200,
+                      fit: BoxFit.cover,
                     ),
                   ),
-                  child: const Text('Assign Crew'),
+                const SizedBox(height: 20),
+                _buildDetailItem('Category', report.category.toUpperCase()),
+                _buildDetailItem(
+                  'Status',
+                  report.status.toUpperCase(),
+                  color: _getStatusColor(report.status),
                 ),
-              ),
-            ],
+                _buildDetailItem('Address', report.locationAddress ?? 'N/A'),
+                const SizedBox(height: 16),
+                Text(
+                  'Description',
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  report.description,
+                  style: GoogleFonts.inter(
+                    color: Colors.grey[700],
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                if (report.status != 'fixed')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _markAsFixed(report.id);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Fixed'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: color ?? Colors.black87,
+            ),
           ),
         ],
       ),
@@ -322,23 +611,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Logout',
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
-        content: const Text(
-          'Are you sure you want to logout from the Admin portal?',
-        ),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(dialogContext);
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => const AuthScreen()),

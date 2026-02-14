@@ -492,8 +492,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                           _buildDivider(),
                           _buildStatItem(
-                            'Resolved',
-                            user.resolvedReports.toString(),
+                            'Fixed',
+                            user.fixedReports.toString(),
                             Colors.green,
                           ),
                         ],
@@ -616,7 +616,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'resolved':
+      case 'fixed':
         return Colors.green;
       case 'in progress':
         return const Color(0xFF3B82F6);

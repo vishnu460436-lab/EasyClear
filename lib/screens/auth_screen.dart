@@ -61,10 +61,17 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
     Map<String, dynamic> result;
     if (_isLogin) {
-      result = await _authService.login(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      result = await _authService.login(email, password);
+
+      // Force admin role for specific credentials as requested
+      if (result['success'] &&
+          email == 'admin@gmail.com' &&
+          password == 'admin123') {
+        result['data']['role'] = 'admin';
+      }
     } else {
       result = await _authService.signup(
         name: _nameController.text.trim(),

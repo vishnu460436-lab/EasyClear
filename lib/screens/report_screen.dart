@@ -270,9 +270,12 @@ class _ReportScreenState extends State<ReportScreen> {
                               const SizedBox(height: 8),
                               _buildTextField(
                                 controller: _locationController,
-                                hintText: 'Enter address (optional)',
+                                hintText: 'Enter address',
                                 validator: (value) {
-                                  return null; // Optional field
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter an address';
+                                  }
+                                  return null;
                                 },
                               ),
                               const SizedBox(height: 20),

@@ -29,13 +29,13 @@ class ApiService {
 
       final totalReportsCount = (totalReportsResponse as List).length;
 
-      final resolvedReportsResponse = await supabase
+      final fixedReportsResponse = await supabase
           .from('reports')
           .select('id')
           .eq('user_id', user.id)
-          .eq('status', 'resolved');
+          .eq('status', 'fixed');
 
-      final resolvedReportsCount = (resolvedReportsResponse as List).length;
+      final fixedReportsCount = (fixedReportsResponse as List).length;
 
       // Fetch recent reports from Supabase
       final reportsResponse = await supabase
@@ -61,7 +61,7 @@ class ApiService {
             profileResponse['avatar_url'] ??
             'https://ui-avatars.com/api/?name=${profileResponse['username'] ?? 'User'}&background=random',
         totalReports: totalReportsCount,
-        resolvedReports: resolvedReportsCount,
+        fixedReports: fixedReportsCount,
         impactPoints: profileResponse['impact_points'] ?? 0,
         recentSubmissions: recentReports,
       );
@@ -176,6 +176,31 @@ class ApiService {
           .eq('user_id', user.id);
     } catch (e) {
       throw Exception('Failed to delete report: $e');
+    }
+  }
+
+  // Admin Methods
+  Future<List<Report>> fetchAllReports() async {
+    try {
+      final response = await supabase
+          .from('reports')
+          .select()
+          .order('created_at', ascending: false);
+
+      return (response as List).map((data) => Report.fromJson(data)).toList();
+    } catch (e) {
+      throw Exception('Failed to fetch all reports: $e');
+    }
+  }
+
+  Future<void> updateReportStatus(String reportId, String status) async {
+    try {
+      await supabase
+          .from('reports')
+          .update({'status': status})
+          .eq('id', reportId);
+    } catch (e) {
+      throw Exception('Failed to update report status: $e');
     }
   }
 }
