@@ -519,8 +519,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ),
                       TextButton(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => AllSubmissionsScreen(
@@ -528,6 +528,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                               ),
                             ),
                           );
+                          if (mounted) {
+                            setState(() {
+                              _userFuture = _apiService.fetchUserProfile();
+                            });
+                          }
                         },
                         child: Text(
                           'View All',
