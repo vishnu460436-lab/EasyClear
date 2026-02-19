@@ -113,7 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 _buildDetailRow('Category', report.category),
                 _buildDetailRow(
                   'Status',
-                  report.status,
+                  report.status.toUpperCase().replaceAll('_', ' '),
                   valueColor: _getStatusColor(report.status),
                 ),
                 _buildDetailRow(
@@ -184,25 +184,21 @@ class _ProfileScreenState extends State<ProfileScreen>
 
               try {
                 await _apiService.deleteReport(reportId);
-                if (mounted) {
-                  setState(() {
-                    _userFuture = _apiService.fetchUserProfile();
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Report deleted successfully'),
-                    ),
-                  );
-                }
+                if (!context.mounted) return;
+                setState(() {
+                  _userFuture = _apiService.fetchUserProfile();
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Report deleted successfully')),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
               }
             },
             child: Text(
@@ -565,7 +561,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                               title: report.title,
                               date:
                                   "${report.createdAt.day}/${report.createdAt.month}/${report.createdAt.year}",
-                              status: report.status,
+                              status: report.status
+                                  .replaceAll('_', ' ')
+                                  .toUpperCase(),
                               statusColor: _getStatusColor(report.status),
                             ),
                           ),
@@ -624,6 +622,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       case 'fixed':
         return Colors.green;
       case 'in progress':
+      case 'in_progress':
         return const Color(0xFF3B82F6);
       case 'pending':
       default:

@@ -30,13 +30,13 @@ class AboutScreen extends StatelessWidget {
               height: 120,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(30),
-                image: DecorationImage(
+                image: const DecorationImage(
                   image: AssetImage('assets/community_app_icon.jpg'),
                   fit: BoxFit.cover,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryColor.withOpacity(0.3),
+                    color: primaryColor.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),

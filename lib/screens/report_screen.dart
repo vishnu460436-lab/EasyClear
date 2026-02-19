@@ -10,7 +10,8 @@ import 'package:latlong2/latlong.dart' as ll;
 import '../services/api_service.dart';
 
 class ReportScreen extends StatefulWidget {
-  const ReportScreen({super.key});
+  final String? initialCategory;
+  const ReportScreen({super.key, this.initialCategory});
 
   @override
   State<ReportScreen> createState() => _ReportScreenState();
@@ -26,6 +27,13 @@ class _ReportScreenState extends State<ReportScreen> {
   final TextEditingController _locationController = TextEditingController();
 
   String? _selectedCategory;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategory = widget.initialCategory;
+  }
+
   final List<Map<String, String>> _categories = [
     {'value': 'pwd', 'label': 'Road Issue / PWD'},
     {'value': 'water', 'label': 'Water Authority'},
@@ -292,20 +300,21 @@ class _ReportScreenState extends State<ReportScreen> {
                               _buildLabel('Category:'),
                               const SizedBox(height: 8),
                               InputDecorator(
-                                decoration:
-                                    _inputDecoration(
-                                      hintText: 'Select Category',
-                                    ).copyWith(
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 16,
-                                          ),
-                                    ),
+                                decoration: _inputDecoration(
+                                  hintText: 'Select Category',
+                                ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     value: _selectedCategory,
                                     isDense: true,
+                                    // Disable if pre-selected via initialCategory
+                                    onChanged: widget.initialCategory != null
+                                        ? null
+                                        : (String? newValue) {
+                                            setState(() {
+                                              _selectedCategory = newValue;
+                                            });
+                                          },
                                     hint: Text(
                                       'Select Category',
                                       style: GoogleFonts.inter(
@@ -318,23 +327,42 @@ class _ReportScreenState extends State<ReportScreen> {
                                         child: Text(category['label']!),
                                       );
                                     }).toList(),
-                                    onChanged: (String? newValue) {
-                                      setState(() {
-                                        _selectedCategory = newValue;
-                                      });
-                                    },
-                                    icon: const Icon(
-                                      Icons.keyboard_arrow_down,
-                                      color: secondaryColor,
-                                    ),
+                                    icon: widget.initialCategory != null
+                                        ? const Icon(
+                                            Icons.lock_outline,
+                                            size: 16,
+                                            color: Colors.grey,
+                                          )
+                                        : const Icon(
+                                            Icons.keyboard_arrow_down,
+                                            color: secondaryColor,
+                                          ),
                                     style: GoogleFonts.inter(
                                       fontSize: 16,
-                                      color: Colors.black87,
+                                      color: widget.initialCategory != null
+                                          ? Colors.grey
+                                          : Colors.black87,
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              if (widget.initialCategory != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: 8,
+                                    left: 4,
+                                  ),
+                                  child: Text(
+                                    'Form optimized for ${widget.initialCategory!.toUpperCase()}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: secondaryColor,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 20),
+
                               // Description
                               _buildLabel('Description:'),
                               const SizedBox(height: 8),

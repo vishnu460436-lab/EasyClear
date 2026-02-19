@@ -9,9 +9,11 @@ Future<void> main() async {
     url: 'https://jcuiazejigywckemuejz.supabase.co',
     anonKey: 'sb_publishable_sfFMriTDBFRMhXzxT8ugZQ_pBXjBKrg',
   );
-  runApp(MyApp());
+  runApp(const MyApp());
 }
+
 final supabase = Supabase.instance.client;
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 

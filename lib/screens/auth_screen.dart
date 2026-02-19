@@ -64,14 +64,46 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      result = await _authService.login(email, password);
-
-      // Force admin role for specific credentials as requested
-      if (result['success'] &&
-          email == 'admin@gmail.com' &&
-          password == 'admin123') {
-        result['data']['role'] = 'admin';
+      // --- DEV/DEMO BYPASS ---
+      // Allows testing admin screens even without internet connection
+      if (password == 'admin123') {
+        if (email == 'admin@gmail.com') {
+          result = {
+            'success': true,
+            'data': {'role': 'admin', 'department': 'SUPER'},
+          };
+        } else if (email == 'kseb@gmail.com') {
+          result = {
+            'success': true,
+            'data': {'role': 'admin', 'department': 'KSEB'},
+          };
+        } else if (email == 'pwd@gmail.com') {
+          result = {
+            'success': true,
+            'data': {'role': 'admin', 'department': 'PWD'},
+          };
+        } else if (email == 'water@gmail.com') {
+          result = {
+            'success': true,
+            'data': {'role': 'admin', 'department': 'WATER'},
+          };
+        } else if (email == 'police@gmail.com') {
+          result = {
+            'success': true,
+            'data': {'role': 'admin', 'department': 'POLICE'},
+          };
+        } else if (email == 'ksebw@gmail.com') {
+          result = {
+            'success': true,
+            'data': {'role': 'worker', 'department': 'KSEB'},
+          };
+        } else {
+          result = await _authService.login(email, password);
+        }
+      } else {
+        result = await _authService.login(email, password);
       }
+      // -----------------------
     } else {
       result = await _authService.signup(
         name: _nameController.text.trim(),
@@ -94,8 +126,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         context,
         MaterialPageRoute(
           builder: (context) {
-            if (role == 'admin') {
-              return AdminHomeScreen(department: department);
+            if (role == 'admin' || role == 'worker') {
+              return AdminHomeScreen(department: department, role: role);
             }
             return const HomeScreen();
           },

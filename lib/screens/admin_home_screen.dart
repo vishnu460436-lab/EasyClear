@@ -8,7 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final String department;
-  const AdminHomeScreen({super.key, required this.department});
+  final String role;
+  const AdminHomeScreen({
+    super.key,
+    required this.department,
+    this.role = 'admin',
+  });
 
   @override
   State<AdminHomeScreen> createState() => _AdminHomeScreenState();
@@ -18,7 +23,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final ApiService _apiService = ApiService();
   List<Report> _allReports = [];
   List<Report> _filteredReports = [];
-  String _selectedCategory = 'All';
+  late String _selectedCategory;
   String _selectedStatus = 'all';
   bool _isLoading = true;
 
@@ -34,6 +39,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Initialize selected category based on department
+    if (widget.department.isNotEmpty &&
+        widget.department.toUpperCase() != 'SUPER') {
+      _selectedCategory = widget.department.toLowerCase();
+    } else {
+      _selectedCategory = 'All';
+    }
     _loadData();
   }
 
@@ -73,15 +85,20 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Color get _deptColor {
-    switch (widget.department.toUpperCase()) {
+    final dept = widget.department.toUpperCase();
+    if (dept == 'SUPER' || dept.isEmpty) return const Color(0xFF1E3A8A);
+
+    switch (dept) {
       case 'KSEB':
         return const Color(0xFFF59E0B);
       case 'WATER':
         return const Color(0xFF3B82F6);
-      case 'ROADS':
-        return const Color(0xFF64748B);
+      case 'PWD':
+        return const Color(0xFF10B981);
+      case 'POLICE':
+        return const Color(0xFFEF4444);
       default:
-        return const Color(0xFF1E3A8A);
+        return const Color(0xFF64748B);
     }
   }
 
@@ -90,11 +107,28 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     const darkColor = Color(0xFF0F172A);
     const bgColor = Color(0xFFF8FAFC);
 
-    final pendingCount = _allReports.where((r) => r.status == 'pending').length;
-    final fixedCount = _allReports.where((r) => r.status == 'fixed').length;
+    // For stats, we filter by department if not Super Admin
+    final reportsForStats =
+        widget.department.toUpperCase() == 'SUPER' || widget.department.isEmpty
+        ? _allReports
+        : _allReports
+              .where(
+                (r) =>
+                    r.category.toLowerCase() == widget.department.toLowerCase(),
+              )
+              .toList();
+
+    final pendingCount = reportsForStats
+        .where((r) => r.status == 'pending')
+        .length;
+    final inProgressCount = reportsForStats
+        .where((r) => r.status == 'in_progress')
+        .length;
+    final fixedCount = reportsForStats.where((r) => r.status == 'fixed').length;
 
     return Scaffold(
       backgroundColor: bgColor,
+      resizeToAvoidBottomInset: true,
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: CustomScrollView(
@@ -107,7 +141,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               elevation: 0,
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(
-                  'Admin Portal',
+                  widget.department.toUpperCase() == 'SUPER' ||
+                          widget.department.isEmpty
+                      ? 'Admin Portal'
+                      : '${widget.department.toUpperCase()} Portal',
                   style: GoogleFonts.outfit(
                     fontWeight: FontWeight.bold,
                     fontSize: 20,
@@ -142,7 +179,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             // Stats Overview
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 24.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -162,7 +202,22 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             });
                           },
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 8),
+                        _buildStatCard(
+                          'In Progress',
+                          inProgressCount.toString(),
+                          Colors.blue,
+                          isSelected: _selectedStatus == 'in_progress',
+                          onTap: () {
+                            setState(() {
+                              _selectedStatus = _selectedStatus == 'in_progress'
+                                  ? 'all'
+                                  : 'in_progress';
+                              _filterReports();
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
                         _buildStatCard(
                           'Fixed',
                           fixedCount.toString(),
@@ -184,47 +239,50 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               ),
             ),
 
-            // Filter Section
-            SliverToBoxAdapter(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: _categories.map((cat) {
-                    final isSelected = _selectedCategory == cat;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(cat.toUpperCase()),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            _selectedCategory = cat;
-                            _filterReports();
-                          });
-                        },
-                        selectedColor: _deptColor.withValues(alpha: 0.2),
-                        checkmarkColor: _deptColor,
-                        labelStyle: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: isSelected ? _deptColor : Colors.grey[600],
+            // Filter Section - Only show for Super Admin
+            if (widget.department.toUpperCase() == 'SUPER' ||
+                widget.department.isEmpty)
+              SliverToBoxAdapter(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: _categories.map((cat) {
+                      final isSelected = _selectedCategory == cat;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(cat.toUpperCase()),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _selectedCategory = cat;
+                              _filterReports();
+                            });
+                          },
+                          // ... rest of the code is unchanged until the end of FilterChip
+                          selectedColor: _deptColor.withValues(alpha: 0.2),
+                          checkmarkColor: _deptColor,
+                          labelStyle: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected ? _deptColor : Colors.grey[600],
+                          ),
+                          backgroundColor: Colors.white,
+                          side: BorderSide(
+                            color: isSelected ? _deptColor : Colors.grey[200]!,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
-                        backgroundColor: Colors.white,
-                        side: BorderSide(
-                          color: isSelected ? _deptColor : Colors.grey[200]!,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
-            ),
 
             // Submissions List Header
             SliverToBoxAdapter(
@@ -262,10 +320,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 40)),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),
+      floatingActionButton: widget.role == 'worker'
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _showAnnouncementDialog,
+              backgroundColor: _deptColor,
+              icon: const Icon(Icons.campaign, color: Colors.white),
+              label: Text(
+                'Post Announcement',
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
     );
   }
 
@@ -275,10 +347,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         return Icons.electric_bolt_rounded;
       case 'WATER':
         return Icons.water_drop_rounded;
-      case 'ROADS':
-        return Icons.add_road_rounded;
-      default:
+      case 'PWD':
+        return Icons.construction_rounded;
+      case 'POLICE':
+        return Icons.local_police_rounded;
+      case 'SUPER':
         return Icons.admin_panel_settings_rounded;
+      default:
+        return Icons.dashboard_rounded;
     }
   }
 
@@ -294,7 +370,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
           decoration: BoxDecoration(
             color: isSelected ? color.withValues(alpha: 0.05) : Colors.white,
             borderRadius: BorderRadius.circular(24),
@@ -317,7 +393,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               Text(
                 value,
                 style: GoogleFonts.outfit(
-                  fontSize: 32,
+                  fontSize: 28, // Slightly smaller to fit 3 columns
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -325,8 +401,11 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
               const SizedBox(height: 4),
               Text(
                 label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                  fontSize: 13,
+                  fontSize: 11, // Slightly smaller to prevent overflow
                   color: isSelected ? color : const Color(0xFF64748B),
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                 ),
@@ -361,29 +440,38 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: _getStatusColor(report.status).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  report.status.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: _getStatusColor(report.status),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(
+                      report.status,
+                    ).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    report.status.toUpperCase().replaceAll('_', ' '),
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: _getStatusColor(report.status),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
-              Text(
-                dateStr,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: const Color(0xFF94A3B8),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  dateStr,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -436,7 +524,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              if (report.status != 'fixed')
+              if (report.status == 'pending')
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _markAsInProgress(report.id),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Start Progress'),
+                  ),
+                )
+              else if (report.status == 'in_progress')
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => _markAsFixed(report.id),
@@ -449,7 +553,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text('Fixed'),
+                    child: const Text('Mark Fixed'),
                   ),
                 ),
             ],
@@ -463,10 +567,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     switch (status.toLowerCase()) {
       case 'fixed':
         return Colors.green;
+      case 'in_progress':
+      case 'in progress':
+        return Colors.blue;
       case 'pending':
         return Colors.orange;
       default:
-        return Colors.blue;
+        return Colors.grey;
     }
   }
 
@@ -505,6 +612,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Report marked as fixed!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _markAsInProgress(String reportId) async {
+    try {
+      await _apiService.updateReportStatus(reportId, 'in_progress');
+      _loadData(); // Refresh list
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report marked as In Progress!')),
         );
       }
     } catch (e) {
@@ -561,7 +686,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 _buildDetailItem('Category', report.category.toUpperCase()),
                 _buildDetailItem(
                   'Status',
-                  report.status.toUpperCase(),
+                  report.status.toUpperCase().replaceAll('_', ' '),
                   color: _getStatusColor(report.status),
                 ),
                 _buildDetailItem('Address', report.locationAddress ?? 'N/A'),
@@ -602,7 +727,26 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (report.status != 'fixed')
+                if (report.status == 'pending')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _markAsInProgress(report.id);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Start Progress'),
+                    ),
+                  )
+                else if (report.status == 'in_progress')
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -618,7 +762,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Fixed'),
+                      child: const Text('Mark Fixed'),
                     ),
                   ),
               ],
@@ -653,6 +797,156 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showAnnouncementDialog() {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
+    String selectedDept = widget.department.toUpperCase() == 'SUPER'
+        ? 'OTHER'
+        : widget.department.toUpperCase();
+    final List<String> availableDepts = [
+      'KSEB',
+      'WATER',
+      'PWD',
+      'POLICE',
+      'OTHER',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (stfContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.campaign, color: _deptColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Public Announcement',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'This message will be visible to all app users.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                if (widget.department.toUpperCase() == 'SUPER') ...[
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedDept,
+                    decoration: InputDecoration(
+                      labelText: 'Post As Department',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items: availableDepts.map((dept) {
+                      return DropdownMenuItem(value: dept, child: Text(dept));
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedDept = value);
+                      }
+                    },
+                  ),
+                ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'e.g., Power Cut Scheduled',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: contentController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: 'Message Content',
+                    hintText: 'Describe the details...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleController.text.isEmpty ||
+                    contentController.text.isEmpty) {
+                  return;
+                }
+
+                Navigator.pop(dialogContext);
+                if (!mounted) return;
+                setState(() => _isLoading = true);
+
+                try {
+                  await _apiService.postAnnouncement(
+                    title: titleController.text.trim(),
+                    content: contentController.text.trim(),
+                    department: selectedDept,
+                  );
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Announcement posted successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _isLoading = false);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _deptColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('Broadcast'),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,8 @@ import 'package:easyclear/main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/report_model.dart';
+import '../models/notification_model.dart';
+import '../models/announcement_model.dart';
 
 class ApiService {
   Future<UserModel> fetchUserProfile() async {
@@ -21,7 +23,6 @@ class ApiService {
           .single();
 
       // Fetch actual counts from reports table
-      // We fetch only IDs to keep it efficient
       final totalReportsResponse = await supabase
           .from('reports')
           .select('id')
@@ -43,9 +44,7 @@ class ApiService {
           .select()
           .eq('user_id', user.id)
           .order('created_at', ascending: false)
-          .limit(
-            20,
-          ); // Fetch more for the "View All" page if needed, but the model only keeps recentSubmissions
+          .limit(20);
 
       // Convert reports JSON to Report objects
       final List<Report> recentReports = (reportsResponse as List)
@@ -84,7 +83,6 @@ class ApiService {
 
     try {
       // 1. Upload Image
-      // Sanitize filename
       final fileExt = imageFile.path.split('.').last;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filePath = '${user.id}/$timestamp.$fileExt';
@@ -123,7 +121,6 @@ class ApiService {
     if (user == null) throw Exception('No user logged in');
 
     try {
-      // 1. Upload Image to 'avatars' bucket
       final fileExt = imageFile.path.split('.').last;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filePath = '${user.id}/$timestamp.$fileExt';
@@ -138,7 +135,6 @@ class ApiService {
 
       final imageUrl = supabase.storage.from('avatars').getPublicUrl(filePath);
 
-      // 2. Update Profile table
       await supabase
           .from('profiles')
           .update({'avatar_url': imageUrl})
@@ -201,6 +197,98 @@ class ApiService {
           .eq('id', reportId);
     } catch (e) {
       throw Exception('Failed to update report status: $e');
+    }
+  }
+
+  // Notification Methods
+  Future<List<NotificationModel>> fetchNotifications() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final response = await supabase
+          .from('notifications')
+          .select()
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((data) => NotificationModel.fromJson(data))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch notifications: $e');
+    }
+  }
+
+  Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await supabase
+          .from('notifications')
+          .update({'is_read': true})
+          .eq('id', notificationId);
+    } catch (e) {
+      throw Exception('Failed to mark notification as read: $e');
+    }
+  }
+
+  Future<int> getUnreadNotificationsCount() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return 0;
+
+    try {
+      final response = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('is_read', false);
+
+      return (response as List).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // Announcement Methods
+  Future<List<Announcement>> fetchAnnouncements() async {
+    try {
+      final response = await supabase
+          .from('announcements')
+          .select()
+          .order('created_at', ascending: false);
+
+      return (response as List)
+          .map((data) => Announcement.fromJson(data))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to fetch announcements: $e');
+    }
+  }
+
+  Future<void> postAnnouncement({
+    required String title,
+    required String content,
+    required String department,
+  }) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) throw Exception('No user logged in');
+
+    try {
+      await supabase.from('announcements').insert({
+        'admin_id': user.id,
+        'title': title,
+        'content': content,
+        'department': department,
+      });
+    } catch (e) {
+      throw Exception('Failed to post announcement: $e');
+    }
+  }
+
+  Future<void> deleteAnnouncement(String id) async {
+    try {
+      await supabase.from('announcements').delete().eq('id', id);
+    } catch (e) {
+      throw Exception('Failed to delete announcement: $e');
     }
   }
 }
