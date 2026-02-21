@@ -5,6 +5,10 @@ import '../services/api_service.dart';
 import '../models/report_model.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'admin_announcements_screen.dart';
+import '../services/auth_service.dart';
+
+import '../models/announcement_model.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final String department;
@@ -23,6 +27,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final ApiService _apiService = ApiService();
   List<Report> _allReports = [];
   List<Report> _filteredReports = [];
+  List<Announcement> _recentAnnouncements = [];
   late String _selectedCategory;
   String _selectedStatus = 'all';
   bool _isLoading = true;
@@ -53,8 +58,24 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     setState(() => _isLoading = true);
     try {
       final reports = await _apiService.fetchAllReports();
+      final announcements = await _apiService.fetchAnnouncements();
+
+      // Filter announcements by department if not super
+      List<Announcement> filteredAnnouncements;
+      if (widget.department.toUpperCase() == 'SUPER') {
+        filteredAnnouncements = announcements;
+      } else {
+        filteredAnnouncements = announcements
+            .where(
+              (a) =>
+                  a.department.toUpperCase() == widget.department.toUpperCase(),
+            )
+            .toList();
+      }
+
       setState(() {
         _allReports = reports;
+        _recentAnnouncements = filteredAnnouncements.take(5).toList();
         _filterReports();
         _isLoading = false;
       });
@@ -281,6 +302,134 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                       );
                     }).toList(),
                   ),
+                ),
+              ),
+
+            // Announcements Section
+            if (_recentAnnouncements.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Your Announcements',
+                            style: GoogleFonts.outfit(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: darkColor,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _navigateToManageAnnouncements,
+                            child: const Text('View All'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 180,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        itemCount: _recentAnnouncements.length,
+                        itemBuilder: (context, index) {
+                          final announcement = _recentAnnouncements[index];
+                          return Container(
+                            width: 280,
+                            margin: const EdgeInsets.only(right: 16, bottom: 8),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.03),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: _deptColor.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        announcement.title,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
+                                        color: Colors.blue,
+                                      ),
+                                      onPressed: () =>
+                                          _showEditDialogHome(announcement),
+                                      visualDensity: VisualDensity.compact,
+                                      constraints: const BoxConstraints(),
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.delete_outline_rounded,
+                                        size: 16,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () => _deleteAnnouncementHome(
+                                        announcement.id,
+                                      ),
+                                      visualDensity: VisualDensity.compact,
+                                      constraints: const BoxConstraints(),
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Expanded(
+                                  child: Text(
+                                    announcement.content,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: Colors.grey[700],
+                                    ),
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  DateFormat(
+                                    'dd MMM yyyy',
+                                  ).format(announcement.createdAt),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -683,6 +832,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     ),
                   ),
                 const SizedBox(height: 20),
+                _buildDetailItem(
+                  'Reported By',
+                  report.userName ?? 'Anonymous user',
+                ),
+                _buildDetailItem(
+                  'User ID',
+                  report.userId,
+                  color: Colors.grey[600],
+                ),
                 _buildDetailItem('Category', report.category.toUpperCase()),
                 _buildDetailItem(
                   'Status',
@@ -833,6 +991,14 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.list_alt),
+                tooltip: 'Manage Announcements',
+                onPressed: () {
+                  Navigator.pop(stfContext);
+                  _navigateToManageAnnouncements();
+                },
+              ),
             ],
           ),
           content: SingleChildScrollView(
@@ -951,6 +1117,140 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
+  void _navigateToManageAnnouncements() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            AdminAnnouncementsScreen(department: widget.department),
+      ),
+    );
+  }
+
+  Future<void> _deleteAnnouncementHome(String id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Announcement'),
+        content: const Text(
+          'Are you sure you want to delete this announcement?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _apiService.deleteAnnouncement(id);
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Announcement deleted')));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showEditDialogHome(Announcement announcement) {
+    final titleController = TextEditingController(text: announcement.title);
+    final contentController = TextEditingController(text: announcement.content);
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Edit Announcement'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: contentController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Content'),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        setState(() => isSaving = true);
+                        try {
+                          await _apiService.updateAnnouncement(
+                            id: announcement.id,
+                            title: titleController.text.trim(),
+                            content: contentController.text.trim(),
+                          );
+
+                          if (!context.mounted) return;
+
+                          Navigator.pop(context);
+                          _loadData();
+
+                          if (!context.mounted) return;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Announcement updated'),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+
+                          setState(() => isSaving = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -967,13 +1267,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogContext);
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const AuthScreen()),
-                (route) => false,
-              );
+              await AuthService().logout();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AuthScreen()),
+                  (route) => false,
+                );
+              }
             },
             child: const Text('Yes', style: TextStyle(color: Colors.redAccent)),
           ),

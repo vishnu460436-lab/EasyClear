@@ -10,6 +10,7 @@ import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../models/announcement_model.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -56,6 +57,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     _loadUnreadCount();
     _loadAnnouncements();
+    _loadDismissedAnnouncements();
+  }
+
+  Future<void> _loadDismissedAnnouncements() async {
+    final user = AuthService().currentUser;
+    if (user == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'dismissed_announcements_${user.id}';
+    final dismissedList = prefs.getStringList(key) ?? [];
+
+    if (mounted) {
+      setState(() {
+        _dismissedAnnouncements.addAll(dismissedList);
+      });
+    }
   }
 
   Future<void> _loadAnnouncements() async {
@@ -948,10 +965,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             setState(() {
                               _dismissedAnnouncements.add(announcement.id);
                             });
+
+                            final user = AuthService().currentUser;
+                            if (user != null) {
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              final key = 'dismissed_announcements_${user.id}';
+                              await prefs.setStringList(
+                                key,
+                                _dismissedAnnouncements.toList(),
+                              );
+                            }
                           },
                           child: const Icon(
                             Icons.close,

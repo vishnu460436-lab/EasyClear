@@ -207,3 +207,79 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- 7. ANNOUNCEMENTS TABLE SETUP
+create table if not exists public.announcements (
+  id uuid default gen_random_uuid() primary key,
+  admin_id uuid references public.profiles(id) not null,
+  title text not null,
+  content text not null,
+  department text not null,
+  created_at timestamp with time zone default now() not null
+);
+
+-- Enable RLS
+alter table public.announcements enable row level security;
+
+-- Drop existing policies to prevent conflicts
+drop policy if exists "Announcements are viewable by everyone" on public.announcements;
+drop policy if exists "Admins can insert announcements" on public.announcements;
+drop policy if exists "Admins can update announcements" on public.announcements;
+drop policy if exists "Admins can delete announcements" on public.announcements;
+
+-- 1. View Policy: Everyone can view announcements
+create policy "Announcements are viewable by everyone"
+  on public.announcements for select
+  using ( true );
+
+-- 2. Insert Policy: Admins can insert announcements
+-- This checks if the user has the 'admin' or 'worker' role in their profile
+create policy "Admins can insert announcements"
+  on public.announcements for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+      and (lower(role) = 'admin' or lower(role) = 'worker')
+    )
+  );
+
+-- 3. Update Policy: Admins can update announcements
+-- Super Admins ('SUPER') can update ALL.
+-- Department Admins can update announcements belonging to their department.
+create policy "Admins can update announcements"
+  on public.announcements for update
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+      and (
+        -- Check if Super Admin
+        lower(department) = 'super'
+        OR
+        -- Check if Admin's department matches Announcement's department (Case-insensitive)
+        lower(department) = lower(announcements.department)
+      )
+    )
+  );
+
+-- 4. Delete Policy: Admins can delete announcements
+-- Same logic as update
+create policy "Admins can delete announcements"
+  on public.announcements for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.profiles
+      where id = auth.uid()
+      and (
+        -- Check if Super Admin
+        lower(department) = 'super'
+        OR
+        -- Check if Admin's department matches Announcement's department (Case-insensitive)
+        lower(department) = lower(announcements.department)
+      )
+    )
+  );

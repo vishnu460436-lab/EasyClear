@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'admin_home_screen.dart';
@@ -36,6 +37,56 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 500),
     )..forward();
+
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    await Future.delayed(Duration.zero); // Let build finish
+    final user = _authService.currentUser;
+    if (user != null) {
+      if (mounted) {
+        setState(() => _isLoading = true);
+      }
+
+      try {
+        // We need to fetch the profile to know the role
+        // We can reuse a method from ApiService or AuthService if available,
+        // but AuthService.login returns profile. currentUser doesn't give profile data directly.
+        // We can query supabase directly here or add a method to AuthService.
+        // Let's query directly to be quick, similar to login.
+
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select()
+            .eq('id', user.id)
+            .single();
+
+        final String role = profile['role'] ?? 'user';
+        final String department = profile['department'] ?? '';
+
+        if (!mounted) return;
+
+        // Navigate based on role
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) {
+              if (role == 'admin' || role == 'worker') {
+                return AdminHomeScreen(department: department, role: role);
+              }
+              return const HomeScreen();
+            },
+          ),
+        );
+      } catch (e) {
+        // If fetching profile fails (maybe network), might stay on auth screen or retry.
+        // For now, let's just stop loading so they can try to login manually if needed.
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    }
   }
 
   @override
@@ -64,46 +115,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // --- DEV/DEMO BYPASS ---
-      // Allows testing admin screens even without internet connection
-      if (password == 'admin123') {
-        if (email == 'admin@gmail.com') {
-          result = {
-            'success': true,
-            'data': {'role': 'admin', 'department': 'SUPER'},
-          };
-        } else if (email == 'kseb@gmail.com') {
-          result = {
-            'success': true,
-            'data': {'role': 'admin', 'department': 'KSEB'},
-          };
-        } else if (email == 'pwd@gmail.com') {
-          result = {
-            'success': true,
-            'data': {'role': 'admin', 'department': 'PWD'},
-          };
-        } else if (email == 'water@gmail.com') {
-          result = {
-            'success': true,
-            'data': {'role': 'admin', 'department': 'WATER'},
-          };
-        } else if (email == 'police@gmail.com') {
-          result = {
-            'success': true,
-            'data': {'role': 'admin', 'department': 'POLICE'},
-          };
-        } else if (email == 'ksebw@gmail.com') {
-          result = {
-            'success': true,
-            'data': {'role': 'worker', 'department': 'KSEB'},
-          };
-        } else {
-          result = await _authService.login(email, password);
-        }
-      } else {
-        result = await _authService.login(email, password);
-      }
-      // -----------------------
+      result = await _authService.login(email, password);
     } else {
       result = await _authService.signup(
         name: _nameController.text.trim(),

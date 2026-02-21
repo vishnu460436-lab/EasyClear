@@ -10,6 +10,7 @@ class Report {
   final String? imageUrl;
   final String status;
   final DateTime createdAt;
+  final String? userName;
 
   Report({
     required this.id,
@@ -23,6 +24,7 @@ class Report {
     this.imageUrl,
     required this.status,
     required this.createdAt,
+    this.userName,
   });
 
   factory Report.fromJson(Map<String, dynamic> json) {
@@ -42,6 +44,9 @@ class Report {
       imageUrl: json['image_url'] as String?,
       status: json['status'] as String? ?? 'pending',
       createdAt: DateTime.parse(json['created_at'] as String),
+      userName: json['profiles'] != null && (json['profiles'] is Map)
+          ? json['profiles']['username'] as String?
+          : null,
     );
   }
 

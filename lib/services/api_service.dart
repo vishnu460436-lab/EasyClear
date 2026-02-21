@@ -180,10 +180,14 @@ class ApiService {
     try {
       final response = await supabase
           .from('reports')
-          .select()
+          .select('*, profiles(username)')
           .order('created_at', ascending: false);
 
-      return (response as List).map((data) => Report.fromJson(data)).toList();
+      return (response as List).map((data) {
+        // Flatten the structure if necessary or just let Report.fromJson handle it
+        // Report.fromJson expects profiles object inside
+        return Report.fromJson(data);
+      }).toList();
     } catch (e) {
       throw Exception('Failed to fetch all reports: $e');
     }
@@ -289,6 +293,21 @@ class ApiService {
       await supabase.from('announcements').delete().eq('id', id);
     } catch (e) {
       throw Exception('Failed to delete announcement: $e');
+    }
+  }
+
+  Future<void> updateAnnouncement({
+    required String id,
+    required String title,
+    required String content,
+  }) async {
+    try {
+      await supabase
+          .from('announcements')
+          .update({'title': title, 'content': content})
+          .eq('id', id);
+    } catch (e) {
+      throw Exception('Failed to update announcement: $e');
     }
   }
 }
